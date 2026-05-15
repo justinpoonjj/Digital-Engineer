@@ -1,0 +1,12 @@
+{
+  "project": "harness-workspace",
+  "features": [
+    {
+      "id": "F001",
+      "name": "Basic Python function",
+      "status": "planned",
+      "description": "Create a simple Python function and test it.",
+      "verification": ["pytest", "ruff check ."]
+    }
+  ]
+}
