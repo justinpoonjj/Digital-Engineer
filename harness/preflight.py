@@ -7,6 +7,29 @@ WORKSPACE_DIR = Path("workspace")
 def run_preflight_checks() -> list[str]:
     problems = []
 
+    nested_workspace = WORKSPACE_DIR / "workspace"
+    if nested_workspace.exists():
+        problems.append(
+            "Nested workspace directory detected at workspace/workspace. "
+            "The LLM likely returned paths starting with workspace/. "
+            "File paths must be relative, e.g. src/calculator.py."
+        )
+
+    expected_tests_dir = WORKSPACE_DIR / "tests"
+    if not expected_tests_dir.exists():
+        problems.append("Missing tests/ directory under workspace root.")
+
+    singular_test_dir = WORKSPACE_DIR / "test"
+    if singular_test_dir.exists():
+        problems.append(
+            "Unexpected test/ directory detected under workspace root. "
+            "Tests must be placed in tests/."
+        )
+
+    expected_src_dir = WORKSPACE_DIR / "src"
+    if not expected_src_dir.exists():
+        problems.append("Missing src/ directory under workspace root.")
+
     for test_file in (WORKSPACE_DIR / "tests").glob("test_*.py"):
         content = test_file.read_text(encoding="utf-8")
 

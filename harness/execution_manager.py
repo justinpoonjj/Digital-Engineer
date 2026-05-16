@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 
 WORKSPACE_DIR = Path("workspace")
+PROTECTED_FILES = {"AGENTS.md", "feature_list.json", "progress.md"}
 
 FILE_BLOCK_PATTERN = re.compile(
     r"FILE:\s*(?P<path>[^\n]+)\n```(?:python|json|markdown|toml|text)?\n(?P<content>.*?)```",
@@ -14,6 +15,28 @@ def is_safe_path(path: Path) -> bool:
         return True
     except ValueError:
         return False
+
+
+def normalize_relative_path(relative_path: str) -> str:
+    cleaned = relative_path.strip().replace("\\", "/")
+
+    if cleaned == "workspace":
+        raise ValueError("Invalid path: cannot write to nested workspace directory.")
+
+    if cleaned.startswith("workspace/"):
+        raise ValueError(
+            f"Invalid path `{relative_path}`. "
+            "Paths must be relative to the workspace root. "
+            "Use `src/...` or `tests/...`, not `workspace/src/...`."
+        )
+
+    if cleaned in PROTECTED_FILES:
+        raise ValueError(
+            f"Protected workspace file rejected: {relative_path}. "
+            "The harness controls AGENTS.md, feature_list.json, and progress.md."
+        )
+
+    return cleaned
     
 def extract_file_changes(llm_output: str) -> list[tuple[str,str]]:
     changes = []
@@ -34,6 +57,7 @@ def apply_file_changes(llm_output: str) -> list[str]:
     changed_files = []
 
     for relative_path, content in changes:
+        relative_path = normalize_relative_path(relative_path)
         target_path = WORKSPACE_DIR / relative_path
 
         if not is_safe_path(target_path):
