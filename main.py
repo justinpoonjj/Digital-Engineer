@@ -3,7 +3,11 @@ from harness.execution_manager import apply_file_changes
 from harness.llm_service import call_llm
 from harness.preflight import run_preflight_checks
 from harness.prompts import build_code_prompt, build_fix_prompt, build_plan_prompt
-from harness.repair_rules import apply_basic_import_repairs, apply_basic_ruff_repairs
+from harness.repair_rules import (
+    apply_basic_import_repairs,
+    apply_basic_pytest_repairs,
+    apply_basic_ruff_repairs,
+)
 from harness.state_manager import append_progress
 from harness.validator import run_validation
 
@@ -43,8 +47,22 @@ def run_harness(user_request: str) -> None:
         for problem in problems:
             print(f"- {problem}")
 
-        print("\nStopping before validation because the workspace layout is invalid.")
-        return
+        repaired_files = apply_basic_pytest_repairs("\n".join(problems))
+
+        if repaired_files:
+            changed_files.extend(repaired_files)
+
+            print("\n=== Applied pytest repair rules ===")
+            for file in repaired_files:
+                print(f"- {file}")
+
+            problems = run_preflight_checks()
+
+        if not problems:
+            print("\nPreflight passed after repair.")
+        else:
+            print("\nStopping before validation because the workspace layout is invalid.")
+            return
 
     print("\n=== Running validation ===")
     validation = run_validation()
@@ -57,6 +75,19 @@ def run_harness(user_request: str) -> None:
             changed_files.extend(repaired_files)
 
             print("\n=== Applied basic Ruff repair rules ===")
+            for file in repaired_files:
+                print(f"- {file}")
+
+            validation = run_validation()
+            print(validation.output)
+
+    if not validation.passed:
+        repaired_files = apply_basic_pytest_repairs(validation.output)
+
+        if repaired_files:
+            changed_files.extend(repaired_files)
+
+            print("\n=== Applied pytest repair rules ===")
             for file in repaired_files:
                 print(f"- {file}")
 
@@ -98,8 +129,22 @@ def run_harness(user_request: str) -> None:
             for problem in problems:
                 print(f"- {problem}")
 
-            print("\nStopping because the workspace layout is invalid.")
-            return
+            repaired_files = apply_basic_pytest_repairs("\n".join(problems))
+
+            if repaired_files:
+                changed_files.extend(repaired_files)
+
+                print("\n=== Applied pytest repair rules ===")
+                for file in repaired_files:
+                    print(f"- {file}")
+
+                problems = run_preflight_checks()
+
+            if problems:
+                print("\nStopping because the workspace layout is invalid.")
+                return
+
+            print("\nPreflight passed after repair.")
 
         if not validation.passed and validation.output == previous_validation_output:
             print("\nSame validation error repeated. Stopping early.")

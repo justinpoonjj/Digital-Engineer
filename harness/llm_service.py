@@ -23,7 +23,7 @@ def call_llm(prompt: str) -> str:
                 "role": "system",
                 "content":(
                 "You are an AI software engineer working inside a harnessed project. "
-                "Folow instructions carefully. Do not claim completion wihtout validation. "
+                "Follow instructions carefully. Do not claim completion without validation. "
                 ),
             },
             {

@@ -67,12 +67,19 @@ File modification rules:
 Python test rules:
 - Put tests directly inside `tests/`.
 - Do not put tests inside `workspace/tests/`.
-- Do not import pytest unless the test file actually uses pytest features.
-- Examples of pytest features include pytest.mark.parametrize, pytest.raises, and fixtures.
-- If pytest is not directly used, write plain assert-based tests without importing pytest.
+- Do not remove existing tests unless the user explicitly asks to delete them.
+- Do not remove edge-case tests, especially tests for errors such as divide-by-zero.
+- If the test uses `pytest.raises`, `pytest.mark`, `pytest.fixture`, or any `pytest.` reference, then `import pytest` is required.
+- If the test does not use any `pytest.` reference, do not import pytest.
+- Do not remove `pytest.raises` just to avoid importing pytest.
+- Before returning the test file, check this condition:
+  - contains `pytest.` -> must include `import pytest`
+  - does not contain `pytest.` -> must not include `import pytest`
 - If pyproject.toml has `pythonpath = ["src"]`, import modules inside `src/` directly.
 - Example: import `src/calculator.py` as `from calculator import add`.
 - All imports must be sorted and formatted according to Ruff.
+- Sort imported names alphabetically.
+- Example: use `from calculator import add, divide, multiply, subtract`.
 - Before returning file changes, mentally check that every imported name is used.
 - Avoid unused imports because Ruff F401 will fail validation.
 
@@ -115,6 +122,17 @@ Important rules:
 - Do not modify progress.md.
 - Only change files related to the failure.
 - Include the full content of each changed file.
+- Do not delete tests to fix validation errors.
+- If the previous validation collected tests, preserve the same or greater number of tests unless the user explicitly asked to delete tests.
+
+Pytest import rule:
+- If the test uses `pytest.raises`, `pytest.mark`, `pytest.fixture`, or any `pytest.` reference, then `import pytest` is required.
+- If the test does not use any `pytest.` reference, do not import pytest.
+- Do not remove `pytest.raises` just to avoid importing pytest.
+- Do not remove edge-case tests, especially tests for errors such as divide-by-zero.
+- Before returning the test file, check this condition:
+  - contains `pytest.` -> must include `import pytest`
+  - does not contain `pytest.` -> must not include `import pytest`
 
 Critical path rules:
 - The workspace root is already handled by the harness.
@@ -142,10 +160,16 @@ Import and lint rules:
 - If pyproject.toml has `pythonpath = ["src"]`, then files inside `src/` are imported directly.
 - Example: import `src/calculator.py` as `from calculator import add`.
 - Do not import it as `from src.calculator import add`.
-- If Ruff reports `F401`, remove the unused import.
-- If Ruff reports `I001`, sort and format the import block.
+- If validation says `NameError: name 'pytest' is not defined`, add `import pytest` if the test file uses `pytest.raises`, `pytest.mark`, or `pytest.fixture`.
+- Do not remove `import pytest` if `pytest.raises`, `pytest.mark`, or `pytest.fixture` is used.
+- If Ruff reports `F401`, remove only the unused import. Do not remove the test code that makes an import used.
+- If Ruff reports `I001`, only sort and format the import block. Do not delete tests, assertions, or pytest usage to fix `I001`.
+- Sort imported names alphabetically.
+- Example: use `from calculator import add, divide, multiply, subtract`.
 - Do not import `pytest` unless pytest is directly used in the test file.
 - For simple tests, use plain `assert` statements without importing pytest.
+- If a test file contains `pytest.`, it must include `import pytest`.
+- If a test file does not contain `pytest.`, it must not include `import pytest`.
 
 Before returning file changes, ensure:
 - The calculator module path is exactly `src/calculator.py`.

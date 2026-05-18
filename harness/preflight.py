@@ -39,4 +39,17 @@ def run_preflight_checks() -> list[str]:
                 "This project uses pythonpath=['src'], so import directly instead."
             )
 
+        uses_pytest = "pytest." in content or "@pytest" in content
+        imports_pytest = "import pytest" in content
+
+        if uses_pytest and not imports_pytest:
+            problems.append(
+                f"{test_file}: uses pytest features but does not import pytest."
+            )
+
+        if imports_pytest and not uses_pytest:
+            problems.append(
+                f"{test_file}: imports pytest but does not use pytest features."
+            )
+
     return problems
