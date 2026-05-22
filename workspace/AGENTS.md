@@ -1,68 +1,33 @@
-## Project Summary
+# AGENTS.md
 
-This is a simple Python project used to test a harnessed AI coding workflow.
+## Project Overview
+This is a Python harness prototype that uses an LLM to generate, validate, and repair code.
 
-The AI must follow the project rules, make minimal changes, and rely on validation before claiming completion.
+The harness controller owns workspace setup, validation, repair attempts, and state updates. Generated code should be returned as full file contents using paths relative to this workspace root.
 
-## Rules:
-- Use paths relative to the workspace directory.
-- Never prefix generated file paths with `workspace/` or `workspace\`.
+## Quick Commands
+- Run tests: `pytest`
+- Run lint: `ruff check .`
+- Run full validation: `pytest && ruff check .`
+
+## Hard Constraints
+- Never delete or weaken tests to make validation pass.
+- Fix implementation before changing tests.
+- Preserve edge-case tests such as `pytest.raises`.
+- Do not modify unrelated files.
+- Do not create or modify a nested `workspace/` directory.
+- Do not modify `progress.md` or `feature_list.json`; the harness controller updates state files after validation.
+- A task is not done until pytest and Ruff pass.
+
+## Path And Import Rules
+- Use paths relative to this workspace root.
 - Correct generated paths look like `src/calculator.py` and `tests/test_calculator.py`.
 - Incorrect generated paths look like `workspace/src/calculator.py`.
-- Do not create or modify a nested `workspace/` directory.
-- Include the full content of each file.
-- Do not include explanations outside the file blocks.
-- Do not modify unrelated files.
-- Do not modify progress.md.
-- The harness controller will update progress.md only after validation passes.
-- Follow the import rules in AGENTS.md.
-- If pyproject.toml has pythonpath = ["src"], import modules inside src directly.
-- Example: src/calculator.py should be imported as `from calculator import add`.
+- If `pyproject.toml` has `pythonpath = ["src"]`, import modules inside `src` directly.
+- Example: `src/calculator.py` should be imported as `from calculator import add`.
 
-## Verification Commands
-
-```powershell
-pytest
-ruff check .
-```
-
-## Python Test Rules
-
-- Use simple `assert` statements for basic tests.
-- Put tests directly inside `tests/`.
-- Do not put tests inside `workspace/tests/`.
-- Do not import `pytest` unless the test file directly uses pytest-specific features.
-- Only import what is actually used.
-- Avoid unused imports because Ruff rule `F401` will fail validation.
-- Keep imports sorted and formatted because Ruff rule `I001` will fail validation.
-
-Correct:
-
-```python
-from calculator import add
-
-
-def test_add_positive_numbers():
-    assert add(2, 3) == 5
-```
-
-Incorrect:
-
-```python
-import pytest
-
-from calculator import add
-
-
-def test_add_positive_numbers():
-    assert add(2, 3) == 5
-```
-
-## Definition of Done
-
-A task is complete only when:
-
-* The requested behavior is implemented.
-* Tests pass.
-* Ruff passes.
-* `progress.md` is updated.
+## Topic Docs
+- `harness_map.md` - read first to understand the harness structure.
+- `docs/testing-standards.md` - read when writing or repairing tests.
+- `docs/repair-rules-guide.md` - read when changing validation parsing or repair prompts.
+- `docs/state-management.md` - read when updating `progress.md`, `feature_list.json`, `run_history.json`, or `failure_log.json`.

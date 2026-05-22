@@ -4,9 +4,30 @@
     {
       "id": "F001",
       "name": "Basic Python function",
-      "status": "planned",
+      "status": "completed",
       "description": "Create a simple Python function and test it.",
-      "verification": ["pytest", "ruff check ."]
+      "files_changed": ["src/calculator.py", "tests/test_calculator.py"],
+      "tests_added": ["tests/test_calculator.py"],
+      "verification": ["pytest", "ruff check ."],
+      "validation_status": "passed"
+    },
+    {
+      "id": "F002",
+      "name": "Repo-visible harness knowledge",
+      "status": "completed",
+      "description": "Split agent guidance into a short AGENTS.md router plus focused architecture, testing, repair, and state docs.",
+      "files_changed": [
+        "AGENTS.md",
+        "harness_map.md",
+        "docs/testing-standards.md",
+        "docs/repair-rules-guide.md",
+        "docs/state-management.md",
+        "run_history.json",
+        "failure_log.json"
+      ],
+      "tests_added": [],
+      "verification": ["pytest -p no:cacheprovider", "python -m compileall harness main.py"],
+      "validation_status": "passed_with_ruff_unavailable"
     }
   ]
 }

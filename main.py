@@ -8,7 +8,7 @@ from harness.repair_rules import (
     apply_basic_pytest_repairs,
     apply_basic_ruff_repairs,
 )
-from harness.state_manager import append_progress
+from harness.state_manager import append_failure_log, append_progress, append_run_history
 from harness.validator import run_validation
 
 
@@ -16,6 +16,8 @@ MAX_FIX_ATTEMPTS = 2
 
 
 def run_harness(user_request: str) -> None:
+    repair_attempt_count = 0
+
     print("\n=== Loading context ===")
     context = load_context()
 
@@ -50,6 +52,7 @@ def run_harness(user_request: str) -> None:
         repaired_files = apply_basic_pytest_repairs("\n".join(problems))
 
         if repaired_files:
+            repair_attempt_count += 1
             changed_files.extend(repaired_files)
 
             print("\n=== Applied pytest repair rules ===")
@@ -62,6 +65,14 @@ def run_harness(user_request: str) -> None:
             print("\nPreflight passed after repair.")
         else:
             print("\nStopping before validation because the workspace layout is invalid.")
+            append_failure_log(
+                user_request=user_request,
+                failure_layer="preflight",
+                tool="preflight",
+                error_summary="Workspace layout is invalid.",
+                repair_rule_used="pytest_preflight_repair",
+                repair_successful=False,
+            )
             return
 
     print("\n=== Running validation ===")
@@ -72,6 +83,7 @@ def run_harness(user_request: str) -> None:
         repaired_files = apply_basic_ruff_repairs(validation.output)
 
         if repaired_files:
+            repair_attempt_count += 1
             changed_files.extend(repaired_files)
 
             print("\n=== Applied basic Ruff repair rules ===")
@@ -85,6 +97,7 @@ def run_harness(user_request: str) -> None:
         repaired_files = apply_basic_pytest_repairs(validation.output)
 
         if repaired_files:
+            repair_attempt_count += 1
             changed_files.extend(repaired_files)
 
             print("\n=== Applied pytest repair rules ===")
@@ -132,6 +145,7 @@ def run_harness(user_request: str) -> None:
             repaired_files = apply_basic_pytest_repairs("\n".join(problems))
 
             if repaired_files:
+                repair_attempt_count += 1
                 changed_files.extend(repaired_files)
 
                 print("\n=== Applied pytest repair rules ===")
@@ -142,6 +156,14 @@ def run_harness(user_request: str) -> None:
 
             if problems:
                 print("\nStopping because the workspace layout is invalid.")
+                append_failure_log(
+                    user_request=user_request,
+                    failure_layer="preflight",
+                    tool="preflight",
+                    error_summary="Workspace layout is invalid after repair.",
+                    repair_rule_used="pytest_preflight_repair",
+                    repair_successful=False,
+                )
                 return
 
             print("\nPreflight passed after repair.")
@@ -156,6 +178,7 @@ def run_harness(user_request: str) -> None:
         repaired_files = apply_basic_import_repairs(validation.output)
 
         if repaired_files:
+            repair_attempt_count += 1
             changed_files.extend(repaired_files)
 
             print("\n=== Applied basic repair rules ===")
@@ -168,6 +191,14 @@ def run_harness(user_request: str) -> None:
     if not validation.passed:
         print("\n=== Final Result ===")
         print("Validation failed after fix attempts.")
+        append_failure_log(
+            user_request=user_request,
+            failure_layer="feedback",
+            tool="pytest_or_ruff",
+            error_summary=validation.output[:500],
+            repair_rule_used="llm_fix_prompt",
+            repair_successful=False,
+        )
         return
 
     print("\n=== Updating progress ===")
@@ -176,6 +207,12 @@ def run_harness(user_request: str) -> None:
         plan=plan,
         changed_files=changed_files,
         validation_output=validation.output,
+    )
+    append_run_history(
+        user_request=user_request,
+        pytest_passed=True,
+        ruff_passed=True,
+        repair_attempts=repair_attempt_count + fix_attempts,
     )
 
     print("\n=== Final Result ===")
