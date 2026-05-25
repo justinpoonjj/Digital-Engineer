@@ -11,33 +11,75 @@ def append_progress(
     plan: str,
     changed_files: list[str],
     validation_output: str,
+    task_interpretation: str | None = None,
+    relevant_previous_state: str | None = None,
+    validation_result: str | None = None,
+    failures_encountered: list[str] | None = None,
+    final_status: str = "Success",
+    next_step: str = "Continue with the next requested feature or repair task.",
 ) -> None:
     progress_path = WORKSPACE_DIR / "progress.md"
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     changed_files_text = "\n".join(f"- {file}" for file in changed_files)
+    if not changed_files_text:
+        changed_files_text = "- None"
+
+    failures_text = "\n".join(f"- {failure}" for failure in failures_encountered or [])
+    if not failures_text:
+        failures_text = "- None recorded."
+
+    task_interpretation = task_interpretation or user_request
+    relevant_previous_state = (
+        relevant_previous_state
+        or "Loaded durable context files during clock-in and used only task-relevant state."
+    )
+    validation_result = validation_result or "- See validation output below."
 
     entry = f"""
 
 ## {timestamp}
 
-### User Request
+### Current User Request
 
 {user_request}
+
+### Task Interpretation
+
+{task_interpretation}
+
+### Relevant Previous State
+
+{relevant_previous_state}
 
 ### Plan
 
 {plan}
 
-### Changed Files
+### Files Changed
 
 {changed_files_text}
 
-### Validation
+### Validation Result
+
+{validation_result}
 
 ```text
 {validation_output}
+```
+
+### Failures Encountered
+
+{failures_text}
+
+### Final Status
+
+{final_status}
+
+### Next Step
+
+{next_step}
 
 """
     with progress_path.open("a", encoding="utf-8") as file:
@@ -68,11 +110,20 @@ def write_json_list(path: Path, entries: list[dict]) -> None:
     )
 
 
+def get_next_session_id() -> str:
+    history_path = WORKSPACE_DIR / "run_history.json"
+    history = read_json_list(history_path)
+    return f"session_{len(history) + 1:03}"
+
+
 def append_run_history(
     user_request: str,
     pytest_passed: bool,
     ruff_passed: bool,
     repair_attempts: int,
+    changed_files: list[str],
+    final_status: str,
+    session_id: str | None = None,
     modified_unrelated_files: bool = False,
     tests_deleted: bool = False,
 ) -> None:
@@ -80,14 +131,18 @@ def append_run_history(
     history = read_json_list(history_path)
 
     entry = {
+        "session_id": session_id or f"session_{len(history) + 1:03}",
         "task_id": f"task_{len(history) + 1:03}",
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
         "task": user_request,
         "mode": "harness_supported",
         "pytest_passed": pytest_passed,
         "ruff_passed": ruff_passed,
         "repair_attempts": repair_attempts,
+        "changed_files": changed_files,
         "modified_unrelated_files": modified_unrelated_files,
         "tests_deleted": tests_deleted,
+        "final_status": final_status,
     }
 
     history.append(entry)
@@ -101,12 +156,15 @@ def append_failure_log(
     error_summary: str,
     repair_rule_used: str | None,
     repair_successful: bool,
+    session_id: str | None = None,
 ) -> None:
     failure_path = WORKSPACE_DIR / "failure_log.json"
     failures = read_json_list(failure_path)
 
     failures.append(
         {
+            "session_id": session_id,
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
             "task": user_request,
             "failure_layer": failure_layer,
             "tool": tool,

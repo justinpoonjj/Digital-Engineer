@@ -7,10 +7,14 @@ They are durable project memory. They should make it possible for a fresh agent 
 
 ## progress.md
 Use this file to record:
-- current task
-- completed work
-- failed validation attempts
-- known blockers
+- current user request
+- task interpretation
+- relevant previous state
+- plan
+- changed files
+- validation result
+- failures encountered
+- final status
 - next step
 
 The harness controller should update `progress.md` after validation. Generated code responses should not edit it directly.
@@ -27,17 +31,23 @@ Update `feature_list.json` when a feature is added, completed, blocked, or other
 
 ## run_history.json
 Use this file to track completed harness runs:
+- session id
 - task id
+- timestamp
 - user task
 - mode
 - pytest result
 - Ruff result
 - repair attempt count
+- changed files
 - whether unrelated files were modified
 - whether tests were deleted or weakened
+- final status
 
 ## failure_log.json
 Use this file to track validation failures and repair outcomes:
+- session id
+- timestamp
 - task
 - failure layer
 - tool

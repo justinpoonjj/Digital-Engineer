@@ -28,6 +28,8 @@ def load_context() -> str:
         WORKSPACE_DIR / "docs" / "testing-standards.md",
         WORKSPACE_DIR / "docs" / "repair-rules-guide.md",
         WORKSPACE_DIR / "docs" / "state-management.md",
+        WORKSPACE_DIR / "docs" / "session-handoff.md",
+        WORKSPACE_DIR / "DECISIONS.md",
         WORKSPACE_DIR / "feature_list.json",
         WORKSPACE_DIR / "progress.md",
         WORKSPACE_DIR / "run_history.json",
