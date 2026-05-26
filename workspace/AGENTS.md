@@ -16,8 +16,17 @@ The harness controller owns workspace setup, validation, repair attempts, and st
 - Preserve edge-case tests such as `pytest.raises`.
 - Do not modify unrelated files.
 - Do not create or modify a nested `workspace/` directory.
-- Do not modify `progress.md` or `feature_list.json`; the harness controller updates state files after validation.
+- Do not modify `progress.md`, `feature_list.json`, or `task_breakdown.md`; the harness controller updates state files after validation.
 - A task is not done until pytest and Ruff pass.
+
+## Task Breakdown Rules
+
+- Read `task_breakdown.md` during initialization.
+- Use it to identify the current active task and next step.
+- Do not mark subtasks complete unless the work is implemented and validated.
+- Do not remove unfinished tasks.
+- Do not rewrite the task breakdown to hide failures.
+- The harness controller owns final updates to task status after validation.
 
 ## Path And Import Rules
 - Use paths relative to this workspace root.
@@ -31,3 +40,4 @@ The harness controller owns workspace setup, validation, repair attempts, and st
 - `docs/testing-standards.md` - read when writing or repairing tests.
 - `docs/repair-rules-guide.md` - read when changing validation parsing or repair prompts.
 - `docs/state-management.md` - read when updating `progress.md`, `feature_list.json`, `run_history.json`, or `failure_log.json`.
+- `task_breakdown.md` - read during initialization to identify the active task, acceptance criteria, validation requirements, and next step.

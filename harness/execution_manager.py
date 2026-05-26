@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 
 WORKSPACE_DIR = Path("workspace")
-PROTECTED_FILES = {"AGENTS.md", "feature_list.json", "progress.md"}
+PROTECTED_FILES = {"AGENTS.md", "feature_list.json", "progress.md", "task_breakdown.md"}
 
 FILE_BLOCK_PATTERN = re.compile(
     r"FILE:\s*(?P<path>[^\n]+)\n```(?:python|json|markdown|toml|text)?\n(?P<content>.*?)```",
@@ -33,7 +33,8 @@ def normalize_relative_path(relative_path: str) -> str:
     if cleaned in PROTECTED_FILES:
         raise ValueError(
             f"Protected workspace file rejected: {relative_path}. "
-            "The harness controls AGENTS.md, feature_list.json, and progress.md."
+            "The harness controls AGENTS.md, feature_list.json, progress.md, "
+            "and task_breakdown.md."
         )
 
     return cleaned

@@ -1,6 +1,9 @@
+import argparse
+import subprocess
+from pathlib import Path
+
 from harness.context_loader import load_context
 from harness.execution_manager import apply_file_changes
-from harness.llm_service import call_llm
 from harness.preflight import run_preflight_checks
 from harness.prompts import build_code_prompt, build_fix_prompt, build_plan_prompt
 from harness.repair_rules import (
@@ -13,26 +16,108 @@ from harness.state_manager import (
     append_progress,
     append_run_history,
     get_next_session_id,
+    update_task_breakdown_after_failure,
+    update_task_breakdown_after_success,
 )
 from harness.validator import run_validation
 
 
 MAX_FIX_ATTEMPTS = 2
+WORKSPACE_DIR = Path("workspace")
+
+REQUIRED_STARTUP_FILES = [
+    WORKSPACE_DIR / "AGENTS.md",
+    WORKSPACE_DIR / "harness_map.md",
+    WORKSPACE_DIR / "progress.md",
+    WORKSPACE_DIR / "feature_list.json",
+    WORKSPACE_DIR / "run_history.json",
+    WORKSPACE_DIR / "failure_log.json",
+    WORKSPACE_DIR / "docs" / "session-handoff.md",
+    WORKSPACE_DIR / "docs" / "startup-readiness.md",
+    WORKSPACE_DIR / "task_breakdown.md",
+]
 
 
-def clock_in() -> str:
-    print("\n=== Clock In ===")
+def command_is_available(command: list[str]) -> bool:
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=WORKSPACE_DIR,
+            capture_output=True,
+            text=True,
+            shell=False,
+        )
+    except FileNotFoundError:
+        return False
+
+    return completed.returncode == 0
+
+
+def run_task_breakdown_readiness_checks() -> list[str]:
+    task_breakdown_path = WORKSPACE_DIR / "task_breakdown.md"
+
+    if not task_breakdown_path.exists():
+        return ["Missing required startup file: workspace/task_breakdown.md"]
+
+    content = task_breakdown_path.read_text(encoding="utf-8")
+    required_sections = [
+        "## Current Active Task",
+        "## Acceptance Criteria",
+        "## Subtasks",
+        "## Validation Requirements",
+        "## Next Step",
+    ]
+
+    problems = []
+    for section in required_sections:
+        if section not in content:
+            problems.append(f"task_breakdown.md missing section: {section}")
+
+    return problems
+
+
+def run_startup_readiness_checks() -> list[str]:
+    problems = []
+
+    for required_file in REQUIRED_STARTUP_FILES:
+        if not required_file.exists():
+            problems.append(f"Missing required startup file: {required_file}")
+
+    if not command_is_available(["pytest", "--version"]):
+        problems.append("Pytest is not available from workspace/.")
+
+    if not command_is_available(["ruff", "--version"]):
+        problems.append("Ruff is not available from workspace/.")
+
+    problems.extend(run_task_breakdown_readiness_checks())
+    problems.extend(run_preflight_checks())
+
+    return problems
+
+
+def initialize_session() -> tuple[str, list[str]]:
+    print("\n=== Initialization Phase ===")
     context = load_context()
 
-    problems = run_preflight_checks()
+    print("\n=== Running startup readiness checks ===")
+    problems = run_startup_readiness_checks()
     if problems:
-        print("\n=== Preflight problems found during clock-in ===")
+        print("\nStartup readiness failed:")
         for problem in problems:
             print(f"- {problem}")
     else:
-        print("Preflight passed.")
+        print("Startup readiness passed.")
 
+    return context, problems
+
+
+def clock_in() -> str:
+    context, _problems = initialize_session()
     return context
+
+
+def run_initialization_only() -> None:
+    initialize_session()
 
 
 def command_passed(validation_output: str, command: str) -> bool:
@@ -111,6 +196,22 @@ def clock_out_success(
         session_id=session_id,
     )
 
+    completed_subtasks = [
+        f"Implemented the requested task: {user_request}",
+        "Ran preflight before implementation.",
+        "Ran pytest and Ruff validation successfully.",
+    ]
+    if changed_files:
+        completed_subtasks.append(
+            "Updated files: " + ", ".join(changed_files)
+        )
+
+    update_task_breakdown_after_success(
+        user_request=user_request,
+        completed_subtasks=completed_subtasks,
+        next_step="Continue with the next incomplete task from this breakdown.",
+    )
+
 
 def clock_out_failure(
     session_id: str,
@@ -144,14 +245,37 @@ def clock_out_failure(
         session_id=session_id,
     )
 
+    update_task_breakdown_after_failure(
+        user_request=user_request,
+        failure_layer=failure_layer,
+        tool=tool,
+        error_summary=error_summary,
+        next_step="Resolve the blocker above, then rerun initialization and validation.",
+    )
+
 
 def run_harness(user_request: str) -> None:
     session_id = get_next_session_id()
     repair_attempt_count = 0
     failures_encountered = []
 
-    context = clock_in()
+    context, startup_problems = initialize_session()
+    if startup_problems:
+        clock_out_failure(
+            session_id=session_id,
+            user_request=user_request,
+            failure_layer="initialization",
+            tool="startup_readiness",
+            error_summary="\n".join(startup_problems),
+            repair_rule_used=None,
+            changed_files=[],
+            repair_attempts=0,
+        )
+        return
 
+    from harness.llm_service import call_llm
+
+    print("\n=== Implementation Phase ===")
     print("\n=== Planning ===")
     plan_prompt = build_plan_prompt(user_request, context)
     plan = call_llm(plan_prompt)
@@ -452,5 +576,16 @@ def run_harness(user_request: str) -> None:
 
 
 if __name__ == "__main__":
-    request = input("What should the harness build? ")
-    run_harness(request)
+    parser = argparse.ArgumentParser(description="Run the Harness MVP.")
+    parser.add_argument(
+        "--init",
+        action="store_true",
+        help="Run startup readiness checks without generating code.",
+    )
+    args = parser.parse_args()
+
+    if args.init:
+        run_initialization_only()
+    else:
+        request = input("What should the harness build? ")
+        run_harness(request)

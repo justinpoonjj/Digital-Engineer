@@ -175,3 +175,91 @@ def append_failure_log(
     )
 
     write_json_list(failure_path, failures)
+
+
+def format_list_items(items: list[str]) -> str:
+    if not items:
+        return "- None recorded."
+
+    return "\n".join(f"- {item}" for item in items)
+
+
+def update_task_breakdown_after_success(
+    user_request: str,
+    completed_subtasks: list[str],
+    next_step: str,
+) -> None:
+    task_breakdown_path = WORKSPACE_DIR / "task_breakdown.md"
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    completed_subtasks_text = format_list_items(completed_subtasks)
+
+    entry = f"""
+
+## Controller Status Update - {timestamp}
+
+### Result
+
+Validation passed. The harness controller approved this task status update.
+
+### Task
+
+{user_request}
+
+### Completed Subtasks
+
+{completed_subtasks_text}
+
+### Validation Requirements
+
+- [x] Preflight passes
+- [x] Pytest passes
+- [x] Ruff passes
+- [x] Existing tests preserved
+
+### Next Step
+
+{next_step}
+
+"""
+    with task_breakdown_path.open("a", encoding="utf-8") as file:
+        file.write(entry)
+
+
+def update_task_breakdown_after_failure(
+    user_request: str,
+    failure_layer: str,
+    tool: str,
+    error_summary: str,
+    next_step: str,
+) -> None:
+    task_breakdown_path = WORKSPACE_DIR / "task_breakdown.md"
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    entry = f"""
+
+## Blocked / Failed Attempt - {timestamp}
+
+### Result
+
+Validation did not pass. No subtasks were marked complete.
+
+### Task
+
+{user_request}
+
+### Failure
+
+- Layer: {failure_layer}
+- Tool: {tool}
+
+```text
+{error_summary[:500]}
+```
+
+### Next Step
+
+{next_step}
+
+"""
+    with task_breakdown_path.open("a", encoding="utf-8") as file:
+        file.write(entry)

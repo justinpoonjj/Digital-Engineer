@@ -28,6 +28,9 @@ List the files that should be created or modified.
 
 ## Validation Plan
 List the commands that should be run.
+
+## Task Breakdown Update Proposal
+Describe any task_breakdown.md status update the harness controller should consider after validation.
 """
 
 def build_code_prompt(user_request: str, context: str, plan: str) -> str: 
@@ -61,7 +64,9 @@ File modification rules:
 - Do not modify `AGENTS.md`.
 - Do not modify `progress.md`.
 - Do not modify `feature_list.json`.
+- Do not modify `task_breakdown.md`.
 - The harness controller updates progress only after validation passes.
+- The harness controller owns final task_breakdown.md status updates after validation.
 - Do not modify unrelated files.
 
 Python test rules:
@@ -120,6 +125,7 @@ Diagnose the error carefully before producing file changes.
 Important rules:
 - Do not repeat the same failed solution.
 - Do not modify progress.md.
+- Do not modify task_breakdown.md.
 - Only change files related to the failure.
 - Include the full content of each changed file.
 - Do not delete tests to fix validation errors.
@@ -148,6 +154,7 @@ Critical file rules:
 - Do not modify `AGENTS.md`.
 - Do not modify `progress.md`.
 - Do not modify `feature_list.json`.
+- Do not modify `task_breakdown.md`.
 - Only change files related to the failure.
 
 Validation diagnosis rules:
