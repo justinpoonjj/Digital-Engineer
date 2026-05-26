@@ -1,679 +1,79 @@
 # Harness MVP
 
-This repository is a small Python project used to experiment with harnessed AI
-coding workflows.
+This repository is a Python harness prototype for experimenting with reliable AI-assisted coding workflows.
 
-The core lesson from this project is simple:
+The core idea is:
 
-> A capable model is not enough. Reliable execution comes from the harness
-> around the model.
+> A capable model is not enough. Reliable execution comes from the harness around the model.
 
-The harness in this repo plans a task, asks an LLM to produce file changes,
-applies those changes into `workspace/`, checks the result with preflight rules,
-runs validation, applies deterministic repairs for known failure modes, and only
-records progress after validation passes.
-
-This README documents the robustness work added to the harness, why each part
-exists, and what failure it prevents.
-
-## Background
-
-This project follows the harness-engineering idea described in
-[Walking Labs Lecture 01: Strong Models Don't Mean Reliable Execution](https://walkinglabs.github.io/learn-harness-engineering/en/lectures/lecture-01-why-capable-agents-still-fail/).
-
-The lecture makes a few points that directly apply here:
-
-- Model capability and execution reliability are different things.
-- When an agent fails, first inspect the harness instead of immediately blaming
-  or replacing the model.
-- A harness includes instructions, tools, environment setup, state management,
-  verification feedback, and deterministic guardrails.
-- A good workflow has an explicit Definition of Done, such as tests passing and
-  lint passing.
-- Failures should feed a diagnostic loop: run, observe failure, attribute it to
-  a harness layer, fix that layer, and rerun.
-
-This repo is a practical version of that diagnostic loop.
+The harness does not simply ask an LLM to write code and trust the answer. It routes intent, checks startup readiness, resolves the implementation task, builds a task contract, applies generated file changes safely, validates the result with scoped profiles, repairs predictable failures, and records durable state only through controller-owned paths.
 
 ## Project Layout
 
 ```text
 .
-+-- main.py
++-- main.py                         # harness lifecycle coordinator
 +-- harness/
-|   +-- context_loader.py
-|   +-- execution_manager.py
-|   +-- llm_service.py
-|   +-- preflight.py
-|   +-- prompts.py
-|   +-- repair_rules.py
-|   +-- state_manager.py
-|   +-- validator.py
-+-- workspace/
+|   +-- context_loader.py            # context loading by mode
+|   +-- execution_manager.py         # safe file application
+|   +-- llm_service.py               # OpenAI client wrapper
+|   +-- preflight.py                 # workspace structure checks
+|   +-- prompts.py                   # plan/code/fix prompts
+|   +-- repair_rules.py              # deterministic repairs
+|   +-- state_manager.py             # progress/history/failure/task state
+|   +-- validator.py                 # validation profiles
++-- tests/                           # harness/controller tests
+|   +-- test_continuity_artifacts.py
+|   +-- test_initialization_intent.py
++-- workspace/                       # generated product workspace
     +-- AGENTS.md
+    +-- DECISIONS.md
     +-- feature_list.json
+    +-- failure_log.json
+    +-- harness_map.md
     +-- progress.md
     +-- pyproject.toml
-    +-- src/
-    |   +-- calculator.py
-    +-- tests/
-        +-- test_calculator.py
+    +-- run_history.json
+    +-- task_breakdown.md
+    +-- docs/
+    |   +-- debugging-policy.md
+    |   +-- repair-rules-guide.md
+    |   +-- session-handoff.md
+    |   +-- startup-readiness.md
+    |   +-- state-management.md
+    |   +-- testing-standards.md
+    +-- src/                         # generated product source
+    +-- tests/                       # generated product tests
 ```
 
-The harness code lives in `harness/`.
+The root `tests/` folder is for harness/controller tests. The `workspace/tests/` folder is for generated product tests only.
 
-The generated project lives in `workspace/`.
+## Current Architecture
 
-The LLM is allowed to modify project files under `workspace/`, but the harness
-protects important state files such as `AGENTS.md`, `feature_list.json`, and
-`progress.md`.
-
-## How The Harness Runs
-
-The main workflow is implemented in `main.py`.
-
-At a high level, the loop is:
-
-1. Load project context.
-2. Run preflight checks.
-3. Ask the LLM to produce a plan.
-4. Ask the LLM to produce file changes.
-5. Apply the file changes safely.
-6. Run preflight checks again.
-7. Apply deterministic repairs for known problems.
-8. Run validation.
-9. If validation fails, apply deterministic repairs again.
-10. If needed, ask the LLM for a limited number of fix attempts.
-11. Stop early if the same validation error repeats.
-12. Update `progress.md` only after validation passes.
-
-This matters because the LLM is not trusted as the final authority on whether a
-task is done. The harness verifies the result.
-
-## Definition Of Done
-
-A task is complete only when:
-
-- The requested behavior is implemented.
-- Tests pass.
-- Ruff passes.
-- The workspace layout is valid.
-- The harness records the successful run in `workspace/progress.md`.
-
-This avoids the common "verification gap" where an agent claims completion even
-though the code still fails tests or lint.
-
-## Context Layer
-
-File: `harness/context_loader.py`
-
-The context loader reads:
-
-- `workspace/AGENTS.md`
-- `workspace/feature_list.json`
-- `workspace/progress.md`
-
-and combines them into one context string for the LLM.
-
-This gives the LLM project rules, current feature state, and prior progress
-without asking it to rediscover everything from scratch.
-
-Why this improves robustness:
-
-- Reduces repeated project discovery.
-- Keeps project rules visible.
-- Makes the repository the system of record.
-- Helps avoid long-running task drift.
-
-## Prompt Layer
-
-File: `harness/prompts.py`
-
-The prompt layer contains three prompts:
-
-- `build_plan_prompt`
-- `build_code_prompt`
-- `build_fix_prompt`
-
-The plan prompt asks the LLM to reason about the task before changing files.
-
-The code prompt asks for full file changes using a strict format:
-
-    FILE: src/example.py
-    ```python
-    full file content here
-    ```
-
-The fix prompt gives the LLM the validation output and asks it to repair only the
-failure.
-
-### Important Prompt Rules Added
-
-The harness now gives explicit rules for pytest imports:
+The current harness flow is:
 
 ```text
-If the test uses pytest.raises, pytest.mark, pytest.fixture, or any pytest.
-reference, then import pytest is required.
-
-If the test does not use any pytest. reference, do not import pytest.
+User request
+-> intent parser
+-> initialization phase
+-> task resolver
+-> task contract builder
+-> implementation context loading
+-> plan generation
+-> plan acceptance gate
+-> code generation
+-> generation acceptance gate
+-> required file check
+-> preflight
+-> deterministic preflight repair
+-> scoped validation
+-> failure classifier
+-> repair-scope guard
+-> deterministic or LLM repair
+-> state update
 ```
 
-This was added because the model previously learned only one side of the rule:
-
-```text
-Do not import pytest unless pytest is used.
-```
-
-That was incomplete. The opposite rule is also required:
-
-```text
-If pytest is used, import pytest.
-```
-
-The prompt also now says:
-
-- Do not remove existing tests unless explicitly asked.
-- Do not remove edge-case tests, especially divide-by-zero tests.
-- Do not remove `pytest.raises` just to avoid importing pytest.
-- If Ruff reports `I001`, only sort and format imports.
-- Do not delete tests, assertions, or pytest usage to fix lint errors.
-- Sort imported names alphabetically.
-
-For the calculator example, the correct import order is:
-
-```python
-from calculator import add, divide, multiply, subtract
-```
-
-not:
-
-```python
-from calculator import add, subtract, multiply, divide
-```
-
-Why this improves robustness:
-
-- Makes hidden assumptions explicit.
-- Prevents the LLM from fixing lint by deleting meaningful tests.
-- Separates behavior preservation from formatting repair.
-- Gives the model a concrete example of the expected import order.
-
-## Execution Safety Layer
-
-File: `harness/execution_manager.py`
-
-The execution manager parses the LLM's output and writes files into
-`workspace/`.
-
-It accepts only file blocks matching this pattern:
-
-    FILE: path/to/file.py
-    ```python
-    content
-    ```
-
-It also enforces path safety.
-
-### Protected Files
-
-The LLM is not allowed to modify:
-
-- `AGENTS.md`
-- `feature_list.json`
-- `progress.md`
-
-These files are controlled by the harness.
-
-### Path Rules
-
-The LLM must return paths relative to the workspace root:
-
-Correct:
-
-```text
-src/calculator.py
-tests/test_calculator.py
-```
-
-Incorrect:
-
-```text
-workspace/src/calculator.py
-workspace/tests/test_calculator.py
-```
-
-The harness rejects nested workspace paths because they create invalid project
-layouts such as:
-
-```text
-workspace/workspace/src/calculator.py
-```
-
-Why this improves robustness:
-
-- Prevents accidental writes outside the workspace.
-- Prevents nested workspace directories.
-- Prevents the LLM from overwriting harness-owned state files.
-- Forces all changes through a predictable format.
-
-## Preflight Layer
-
-File: `harness/preflight.py`
-
-Preflight checks run before validation.
-
-They catch structural problems that are easier to diagnose before running tests.
-
-The current preflight checks detect:
-
-- A nested `workspace/workspace` directory.
-- Missing `workspace/tests`.
-- Incorrect singular `workspace/test`.
-- Missing `workspace/src`.
-- Bad imports such as `from src.calculator import add`.
-- Test files using pytest features without `import pytest`.
-- Test files importing pytest without using pytest features.
-
-### Pytest Preflight Rule
-
-The pytest rule is intentionally two-way:
-
-```text
-uses pytest features + no import pytest = problem
-imports pytest + no pytest features = problem
-```
-
-This catches both common failures:
-
-- The test uses `pytest.raises` but forgot `import pytest`.
-- The test imports `pytest` but only uses plain `assert`, causing Ruff `F401`.
-
-Why this improves robustness:
-
-- Fails earlier with clearer messages.
-- Catches known mistakes before the validation loop gets noisy.
-- Turns a vague runtime failure into a specific harness diagnosis.
-
-## Validation Layer
-
-File: `harness/validator.py`
-
-Validation runs the project commands from inside `workspace/`:
-
-```powershell
-pytest
-ruff check .
-```
-
-The validator captures:
-
-- command
-- return code
-- stdout
-- stderr
-
-and returns a `ValidationResult`.
-
-If any command fails, validation stops and returns the full output collected so
-far.
-
-Why this improves robustness:
-
-- The harness does not trust visual inspection.
-- The LLM receives concrete failure output.
-- The Definition of Done is machine-checkable.
-
-## Deterministic Repair Layer
-
-File: `harness/repair_rules.py`
-
-This is one of the most important robustness layers.
-
-Some failures are predictable enough that the harness should fix them directly
-instead of asking the LLM to reason about them.
-
-The current deterministic repairs are:
-
-- `apply_basic_import_repairs`
-- `apply_basic_ruff_repairs`
-- `apply_ruff_auto_fix`
-- `apply_simple_import_sort`
-- `apply_basic_pytest_repairs`
-
-### Repair: Bad `src.` Imports
-
-Function:
-
-```python
-apply_basic_import_repairs(validation_output)
-```
-
-If validation reports:
-
-```text
-ModuleNotFoundError: No module named 'src'
-```
-
-the repair scans test files and replaces:
-
-```python
-from src.calculator import add
-```
-
-with:
-
-```python
-from calculator import add
-```
-
-This matches the workspace's `pyproject.toml`:
-
-```toml
-[tool.pytest.ini_options]
-pythonpath = ["src"]
-```
-
-Because `src` is already on the Python path, modules inside `src/` are imported
-directly.
-
-### Repair: Missing `import pytest`
-
-Function:
-
-```python
-apply_basic_pytest_repairs(validation_output)
-```
-
-This repair triggers when validation or preflight reports:
-
-```text
-NameError: name 'pytest' is not defined
-```
-
-or:
-
-```text
-uses pytest features but does not import pytest
-```
-
-It scans `workspace/tests/test_*.py`.
-
-If a test file contains pytest usage such as:
-
-```python
-with pytest.raises(ValueError):
-    divide(5, 0)
-```
-
-but does not contain:
-
-```python
-import pytest
-```
-
-the repair adds:
-
-```python
-import pytest
-
-```
-
-to the top of the file.
-
-Why this matters:
-
-- The LLM previously generated a valid pytest usage but forgot the import.
-- A prompt-only fix was not enough.
-- This failure is simple enough to fix with code.
-
-### Repair: Ruff Import Sorting
-
-Function:
-
-```python
-apply_basic_ruff_repairs(validation_output)
-```
-
-This repair handles Ruff failures such as:
-
-```text
-I001 Import block is un-sorted or un-formatted
-```
-
-When `I001` appears, the harness first calls:
-
-```python
-apply_ruff_auto_fix()
-```
-
-That function tries to run:
-
-```powershell
-ruff check . --fix
-```
-
-from inside `workspace/`.
-
-This is the best fix because Ruff knows exactly how it wants imports organized.
-
-If Ruff is not available on PATH, the harness falls back to:
-
-```python
-apply_simple_import_sort(files)
-```
-
-That fallback handles simple one-line imports like:
-
-```python
-from calculator import add, subtract, multiply, divide
-```
-
-and rewrites them alphabetically:
-
-```python
-from calculator import add, divide, multiply, subtract
-```
-
-Why this matters:
-
-- Import sorting is mechanical.
-- The model should not be asked to creatively solve mechanical formatting.
-- In the observed failure, the LLM tried to fix `I001` by removing pytest usage
-  and reducing the test count from 5 to 4.
-- Deterministic import repair prevents that class of damage.
-
-### Repair: Unused `pytest`
-
-Function:
-
-```python
-apply_basic_ruff_repairs(validation_output)
-```
-
-When Ruff reports `F401`, the harness checks whether `import pytest` is present
-but no pytest feature is used.
-
-If pytest is unused, the repair removes the import.
-
-The key detail is that this repair must not remove `import pytest` if the file
-still contains pytest usage such as:
-
-```python
-pytest.raises
-pytest.mark
-@pytest
-```
-
-Why this matters:
-
-- It handles the original "unused pytest import" case.
-- It does not break the opposite case where pytest is genuinely required.
-
-## Fix Attempt Loop
-
-File: `main.py`
-
-If validation fails after deterministic repairs, the harness asks the LLM to fix
-the failure.
-
-The number of LLM fix attempts is limited:
-
-```python
-MAX_FIX_ATTEMPTS = 2
-```
-
-The harness also tracks the previous validation output.
-
-If the same validation error repeats, it stops early:
-
-```text
-Same validation error repeated. Stopping early.
-```
-
-Why this improves robustness:
-
-- Prevents infinite loops.
-- Avoids wasting tokens on repeated failed fixes.
-- Makes repeated failure visible as a harness issue.
-
-## State Layer
-
-File: `harness/state_manager.py`
-
-Progress is appended only after validation passes.
-
-Each progress entry records:
-
-- timestamp
-- user request
-- plan
-- changed files
-- validation output
-
-This is important because `progress.md` becomes the durable memory of successful
-runs.
-
-Why this improves robustness:
-
-- Failed attempts do not get recorded as successful progress.
-- Later runs can see what was done before.
-- Humans can audit what changed and why.
-
-## Case Study: The Pytest Import Failure
-
-The observed failure looked like this:
-
-```python
-def test_divide_by_zero():
-    with pytest.raises(ValueError):
-        divide(5, 0)
-```
-
-but the file did not include:
-
-```python
-import pytest
-```
-
-That caused:
-
-```text
-NameError: name 'pytest' is not defined
-```
-
-The first prompt rule only said:
-
-```text
-Do not import pytest unless pytest is directly used.
-```
-
-That rule was incomplete. The test did directly use pytest, so the correct
-behavior was to import it.
-
-The harness now handles this at three levels:
-
-1. Prompt rule:
-   if a file contains `pytest.`, it must include `import pytest`.
-
-2. Preflight rule:
-   if a test uses pytest features but does not import pytest, report a problem.
-
-3. Deterministic repair:
-   if the problem appears, insert `import pytest` automatically.
-
-This is the desired harness pattern:
-
-```text
-Prompt rule + preflight check + deterministic repair
-```
-
-## Case Study: The Ruff `I001` Failure
-
-The next failure was Ruff import ordering:
-
-```text
-I001 Import block is un-sorted or un-formatted
-```
-
-The correct import was:
-
-```python
-from calculator import add, divide, multiply, subtract
-```
-
-But the LLM tried to fix the problem by removing pytest usage and deleting the
-divide-by-zero test.
-
-That passed pytest with fewer tests, but it was the wrong fix.
-
-The harness now prevents this in two ways:
-
-1. The prompt explicitly says not to delete tests or remove `pytest.raises` to
-   fix lint.
-
-2. The repair layer handles `I001` mechanically before the LLM gets another
-   chance to edit behavior.
-
-This turns a soft instruction into an executable guardrail.
-
-## Current Calculator Example
-
-The current calculator module includes:
-
-```python
-def add(a, b):
-    return a + b
-
-
-def subtract(a, b):
-    return a - b
-
-
-def multiply(a, b):
-    return a * b
-
-
-def divide(a, b):
-    if b == 0:
-        raise ValueError("Cannot divide by zero")
-    return a / b
-```
-
-The test file includes:
-
-```python
-import pytest
-
-from calculator import add, divide, multiply, subtract
-
-
-def test_divide_by_zero():
-    with pytest.raises(ValueError):
-        divide(5, 0)
-```
-
-The divide-by-zero test is important because it verifies the error behavior, not
-just the happy path.
+The important shift in this iteration is that the harness, not the LLM, decides what the task is and what files are required.
 
 ## Running The Harness
 
@@ -683,187 +83,367 @@ From the repository root:
 python main.py
 ```
 
-Then enter a task when prompted:
+The CLI asks:
 
 ```text
-Add subtract, multiply, and divide functions to the existing calculator module with tests. Keep the existing add function and tests.
+What should the harness do?
 ```
 
-The harness will:
-
-- load context
-- ask the LLM for a plan
-- ask the LLM for file changes
-- apply file changes
-- run preflight checks
-- run deterministic repairs
-- run validation
-- ask for fixes if needed
-- update progress only on success
-
-## Running Validation Manually
-
-From inside `workspace/`:
+For initialization only:
 
 ```powershell
-pytest
-ruff check .
+python main.py --init
 ```
 
-If Ruff is not installed or not on PATH, install it in the environment used by
-the harness before expecting full validation to pass.
+Natural-language readiness requests also stop after initialization:
 
-The harness can still apply a limited fallback import sort, but final validation
-requires the real `ruff` command.
+```text
+Run startup readiness only. Do not implement any feature.
+```
 
-## Troubleshooting
+These requests do not enter planning, code generation, or file application.
 
-### `pytest` passes but Ruff fails with `I001`
+## Startup Readiness
 
-This means imports are not sorted or formatted according to Ruff.
+Startup readiness is an initialization concern, not an implementation task.
 
-Expected calculator import order:
+The readiness report checks:
+
+- required workspace files are found and readable
+- required directories exist
+- validation commands are available
+- task breakdown sections are visible
+- preflight passes
+- final readiness is `READY` or `NOT READY`
+
+It checks workspace landing zones such as:
+
+```text
+workspace/src
+workspace/tests
+```
+
+It does not require future product files such as `src/calculator.py` or `tests/test_calculator.py` during startup. Those files are required later by the task contract after code generation.
+
+## Task Breakdown
+
+`workspace/task_breakdown.md` separates initialization state from implementation work:
+
+```text
+Initialization Status
+Current Active Implementation Task
+Acceptance Criteria
+Subtasks
+Validation Requirements
+Blockers
+Next Step
+```
+
+The LLM may propose task breakdown updates, but the harness controller owns final task status updates after validation.
+
+## Task Resolution
+
+Ambiguous requests such as:
+
+```text
+Implement the first task from task_breakdown.md.
+```
+
+are resolved deterministically by the harness before the LLM plans. The plan and code prompts receive both:
+
+```text
+Original user request
+Resolved implementation task
+```
+
+This prevents the model from treating startup readiness as the implementation task.
+
+## Task Contracts
+
+Implementation tasks are converted into executable contracts.
+
+For the current calculator task, the contract requires:
+
+```text
+src/calculator.py
+tests/test_calculator.py
+```
+
+The same contract defines:
+
+- required files
+- allowed repair files
+- validation profile
+
+If generated output does not satisfy the contract, the harness fails at the generation layer before validation.
+
+## Generation Acceptance
+
+The harness now checks generated output before running tests.
+
+If the LLM returns no valid `FILE:` blocks, the harness retries generation once with a focused prompt. If required files are still missing, the harness records a `generation` failure and stops.
+
+This prevents a bad flow like:
+
+```text
+no files generated
+-> pytest tests/test_calculator.py
+-> file not found
+-> unnecessary repair loop
+```
+
+Missing product files are generation failures, not pytest failures.
+
+## Execution Safety
+
+`harness/execution_manager.py` accepts file changes only in this format:
+
+```text
+FILE: src/example.py
+```python
+full file content here
+```
+```
+
+Paths must be relative to the workspace root:
+
+```text
+src/calculator.py
+tests/test_calculator.py
+```
+
+Paths like this are rejected:
+
+```text
+workspace/src/calculator.py
+workspace/tests/test_calculator.py
+```
+
+Protected workspace files include:
+
+- `AGENTS.md`
+- `feature_list.json`
+- `progress.md`
+- `task_breakdown.md`
+
+Protected harness test paths include:
+
+- `tests/test_initialization_intent.py`
+- `tests/test_continuity_artifacts.py`
+
+The generated workspace may not modify harness/controller tests.
+
+## Context Modes
+
+`harness/context_loader.py` supports context modes:
 
 ```python
-from calculator import add, divide, multiply, subtract
+load_context(mode="initialization")
+load_context(mode="implementation")
 ```
 
-The harness should now attempt `ruff check . --fix` automatically.
+Initialization context includes startup readiness and state orientation.
 
-### `NameError: name 'pytest' is not defined`
+Implementation context focuses on:
 
-The test file uses pytest features without importing pytest.
+- agent rules
+- harness map
+- testing standards
+- repair rules
+- debugging policy
+- task breakdown
+- feature list
 
-Expected fix:
+This reduces the chance that readiness documentation dominates implementation planning.
+
+## Validation Profiles
+
+`harness/validator.py` supports scoped profiles:
+
+- `startup`
+- `implementation`
+- `calculator`
+- `harness`
+- `full`
+
+The calculator profile validates product files only:
+
+```text
+pytest tests/test_calculator.py
+ruff check src/calculator.py tests/test_calculator.py
+```
+
+Before running pytest or Ruff, the validator checks that required files exist. Missing required files are reported as generation errors.
+
+## Preflight And Deterministic Repair
+
+Preflight checks catch structural and import issues before validation.
+
+Current checks include:
+
+- nested `workspace/workspace`
+- missing `src/`
+- missing `tests/`
+- incorrect `test/`
+- bad `from src...` imports
+- missing `import pytest` when pytest features are used
+- unused `import pytest` when pytest features are not used
+
+`harness/repair_rules.py` now includes `apply_preflight_repairs()`.
+
+It can fix:
+
+```python
+from src.calculator import add
+```
+
+to:
+
+```python
+from calculator import add
+```
+
+and remove unused:
 
 ```python
 import pytest
 ```
 
-at the top of the test file.
+when the test only uses plain `assert`.
 
-The harness should now catch this during preflight or deterministic repair.
+## Repair Scope
 
-### Ruff reports `F401` for `pytest`
+The harness distinguishes product bugs from harness bugs.
 
-This means `pytest` is imported but no pytest feature is used.
-
-Valid options:
-
-- remove `import pytest` if the file only uses plain asserts
-- keep `import pytest` if the file uses `pytest.raises`, `pytest.mark`,
-  `pytest.fixture`, or another `pytest.` reference
-
-The harness must not remove the test code just to make the import unused.
-
-### The LLM writes files under `workspace/workspace`
-
-This means the LLM returned paths like:
-
-```text
-workspace/src/calculator.py
-```
-
-instead of:
+For the calculator task, allowed repair files are:
 
 ```text
 src/calculator.py
+tests/test_calculator.py
 ```
 
-The execution manager and preflight checks reject this.
+If validation fails in a root harness test, controller file, state file, or unrelated doc, the harness stops and logs `validation_scope` instead of asking the LLM to repair it.
 
-## Design Principles Used
-
-### 1. Prompt Rules Are Soft Constraints
-
-Prompt rules help guide the model, but they are not enough for predictable
-reliability.
-
-Whenever a failure is simple and recurring, convert it into code.
-
-In this repo:
-
-- pytest import mistakes became preflight and repair rules
-- Ruff import sorting became deterministic repair
-- nested workspace paths became path validation
-
-### 2. Verification Is The Source Of Truth
-
-The LLM's answer is not considered complete until validation passes.
-
-This follows the harness-engineering idea that a Definition of Done should be
-machine-verifiable.
-
-### 3. Deterministic Repairs Beat Repeated LLM Fixes
-
-The LLM should not be asked to solve problems that tools can fix exactly.
-
-Examples:
-
-- import sorting
-- obvious import path rewrites
-- missing `import pytest` when `pytest.` is used
-
-### 4. Preserve Behavior While Fixing Format
-
-Formatting and lint repairs must not delete behavior.
-
-That is why the prompt now says:
+The rule is documented in:
 
 ```text
-If Ruff reports I001, only sort and format the import block.
-Do not delete tests, assertions, or pytest usage to fix I001.
+workspace/docs/debugging-policy.md
 ```
 
-### 5. Every Failure Should Strengthen The Harness
+and enforced in controller code.
 
-The goal is not merely to fix one run.
+## State And Handoff
 
-The goal is to make sure the same failure does not happen again.
+The controller owns durable state updates:
 
-That is why this harness now has:
+- `workspace/progress.md`
+- `workspace/run_history.json`
+- `workspace/failure_log.json`
+- `workspace/task_breakdown.md`
 
-- better prompt rules
-- preflight detection
-- deterministic repair functions
-- repeated-error stopping
-- validation-based progress updates
+The LLM may not directly rewrite these through generated file changes.
 
-## Future Improvements
+Successful runs append progress and run history. Failed runs append failure history and task breakdown blockers.
 
-Useful next improvements:
+## Running Tests
 
-- Add tests for the harness itself.
-- Add a preflight rule that checks test counts do not decrease after a fix.
-- Parse pytest output and remember how many tests were collected.
-- Make `validator.py` handle missing commands more gracefully.
-- Add a dependency check for `ruff` before running the harness.
-- Run `ruff check . --fix` only for fixable lint categories.
-- Add structured logs for each failure layer:
-  task specification, context provision, environment, verification, and state.
-- Add a dry-run mode that prints intended file writes before applying them.
+Run harness/controller tests from the repository root:
+
+```powershell
+pytest tests
+```
+
+Run generated product tests from the workspace:
+
+```powershell
+cd workspace
+pytest tests/test_calculator.py
+```
+
+Run Ruff when available:
+
+```powershell
+cd workspace
+ruff check src/calculator.py tests/test_calculator.py
+```
+
+At the time of writing, this environment reports Ruff as unavailable on PATH, so startup readiness returns `NOT READY` until Ruff is installed or exposed to the harness environment.
+
+## Important Docs
+
+- `workspace/AGENTS.md` - high-level agent rules
+- `workspace/harness_map.md` - current architecture map
+- `workspace/DECISIONS.md` - architectural decision log
+- `workspace/task_breakdown.md` - active implementation task
+- `workspace/docs/startup-readiness.md` - readiness checklist and report expectations
+- `workspace/docs/debugging-policy.md` - scoped repair policy
+- `workspace/docs/testing-standards.md` - product test conventions
+- `workspace/docs/repair-rules-guide.md` - repair behavior guidance
+- `workspace/docs/state-management.md` - state ownership rules
+- `workspace/docs/session-handoff.md` - handoff expectations
+
+## Design Principles
+
+### Harness Decides, LLM Implements
+
+The model should not infer the active task from noisy context. The harness resolves the task and passes it explicitly into prompts.
+
+### Startup Is Not Implementation
+
+Readiness checks confirm the workspace is safe to use. They do not count as product work.
+
+### Generation Must Produce Artifacts
+
+Implementation requests must generate required files before validation runs.
+
+### Validation Is Scoped
+
+Product implementation should not accidentally validate or repair harness tests.
+
+### Repairs Must Stay In Scope
+
+The Digital Engineer can repair files directly related to the active product task. Harness bugs are logged and routed separately.
+
+### Deterministic Repairs Beat Repeated LLM Fixes
+
+Predictable failures such as bad imports and unused pytest imports are fixed by code before asking the LLM for another repair.
+
+## Current Known Environment Issue
+
+Startup readiness currently reports:
+
+```text
+ruff --version: FAIL
+Command not found: ruff
+```
+
+Install or expose Ruff in the Python environment used by the harness before expecting full readiness or lint validation to pass.
 
 ## Summary
 
-This harness started as a prompt-driven coding loop.
+This harness started as a simple prompt-driven coding loop.
 
-It became more robust by adding executable guardrails:
+It now includes:
 
-- context loading
+- intent routing
+- readiness reports
+- deterministic task resolution
+- task contracts
+- generation retries
+- required-file gates
 - protected file writes
-- path normalization
-- preflight checks
-- validation commands
-- deterministic repair rules
-- repeated-failure stopping
-- progress logging after successful validation
+- separated harness and product tests
+- validation profiles
+- preflight repairs
+- scoped repair routing
+- durable state and handoff logs
 
-That is the main harness-engineering pattern:
+The main harness-engineering pattern is:
 
 ```text
 Do not rely on the model to remember every rule.
-Put important rules into the environment.
+Put important rules into the controller.
 Verify the result.
 Repair predictable failures with code.
-Record only validated success.
+Record only controlled outcomes.
 ```
