@@ -21,21 +21,26 @@ def format_context_file(path: Path) -> str:
 """
 
 
-def load_context() -> str:
-    context_files = [
-        WORKSPACE_DIR / "AGENTS.md",
-        WORKSPACE_DIR / "harness_map.md",
-        WORKSPACE_DIR / "docs" / "testing-standards.md",
-        WORKSPACE_DIR / "docs" / "repair-rules-guide.md",
-        WORKSPACE_DIR / "docs" / "state-management.md",
-        WORKSPACE_DIR / "docs" / "session-handoff.md",
-        WORKSPACE_DIR / "docs" / "startup-readiness.md",
-        WORKSPACE_DIR / "DECISIONS.md",
-        WORKSPACE_DIR / "task_breakdown.md",
-        WORKSPACE_DIR / "feature_list.json",
-        WORKSPACE_DIR / "progress.md",
-        WORKSPACE_DIR / "run_history.json",
-        WORKSPACE_DIR / "failure_log.json",
-    ]
+def load_context(mode: str = "implementation") -> str:
+    if mode == "initialization":
+        context_files = [
+            WORKSPACE_DIR / "AGENTS.md",
+            WORKSPACE_DIR / "harness_map.md",
+            WORKSPACE_DIR / "docs" / "startup-readiness.md",
+            WORKSPACE_DIR / "task_breakdown.md",
+            WORKSPACE_DIR / "progress.md",
+        ]
+    elif mode == "implementation":
+        context_files = [
+            WORKSPACE_DIR / "AGENTS.md",
+            WORKSPACE_DIR / "harness_map.md",
+            WORKSPACE_DIR / "docs" / "testing-standards.md",
+            WORKSPACE_DIR / "docs" / "repair-rules-guide.md",
+            WORKSPACE_DIR / "docs" / "debugging-policy.md",
+            WORKSPACE_DIR / "task_breakdown.md",
+            WORKSPACE_DIR / "feature_list.json",
+        ]
+    else:
+        raise ValueError(f"Unknown context mode: {mode}")
 
     return "\n".join(format_context_file(path) for path in context_files)

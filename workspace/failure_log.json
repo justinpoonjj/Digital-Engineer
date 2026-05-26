@@ -1,0 +1,92 @@
+[
+  {
+    "session_id": "session_001",
+    "timestamp": "2026-05-26T16:15:15",
+    "task": "Implement the first task from task_breakdown.md. If no task is defined, create a simple calculator module with an add(a, b) function and tests. Preserve the workspace structure and run validation with pytest and Ruff.",
+    "failure_layer": "feedback",
+    "tool": "pytest_or_ruff",
+    "error_summary": "\nCommand: pytest\nReturn code: 0\n\nSTDOUT:\n============================= test session starts =============================\nplatform win32 -- Python 3.13.5, pytest-9.0.3, pluggy-1.6.0\nrootdir: C:\\Users\\justi\\Documents\\Harness-MVP\\workspace\nconfigfile: pyproject.toml\ntestpaths: tests\nplugins: anyio-4.13.0\ncollected 8 items\n\ntests\\test_continuity_artifacts.py .                                     [ 12%]\ntests\\test_initialization_intent.py .......                              [100%]\n\n=================",
+    "repair_rule_used": "llm_fix_prompt",
+    "repair_successful": false
+  },
+  {
+    "session_id": "session_001",
+    "timestamp": "2026-05-26T16:19:51",
+    "task": "Implement the first task from task_breakdown.md. If no task is defined, create a simple calculator module with an add(a, b) function and tests. Preserve the workspace structure and run validation with pytest and Ruff.",
+    "failure_layer": "feedback",
+    "tool": "pytest_or_ruff",
+    "error_summary": "\nCommand: pytest\nReturn code: 2\n\nSTDOUT:\n============================= test session starts =============================\nplatform win32 -- Python 3.13.5, pytest-9.0.3, pluggy-1.6.0\nrootdir: C:\\Users\\justi\\Documents\\Harness-MVP\\workspace\nconfigfile: pyproject.toml\ntestpaths: tests\nplugins: anyio-4.13.0\ncollected 1 item / 1 error\n\n=================================== ERRORS ====================================\n____________ ERROR collecting tests/test_initialization_intent.py _____________\nImportErr",
+    "repair_rule_used": "llm_fix_prompt",
+    "repair_successful": false
+  },
+  {
+    "session_id": "session_001",
+    "timestamp": "2026-05-26T16:19:51",
+    "task": "Implement the first task from task_breakdown.md. If no task is defined, create a simple calculator module with an add(a, b) function and tests. Preserve the workspace structure and run validation with pytest and Ruff.",
+    "failure_layer": "feedback",
+    "tool": "pytest_or_ruff",
+    "error_summary": "\nCommand: pytest\nReturn code: 2\n\nSTDOUT:\n============================= test session starts =============================\nplatform win32 -- Python 3.13.5, pytest-9.0.3, pluggy-1.6.0\nrootdir: C:\\Users\\justi\\Documents\\Harness-MVP\\workspace\nconfigfile: pyproject.toml\ntestpaths: tests\nplugins: anyio-4.13.0\ncollected 1 item / 1 error\n\n=================================== ERRORS ====================================\n____________ ERROR collecting tests/test_initialization_intent.py _____________\nImportErr",
+    "repair_rule_used": "llm_fix_prompt",
+    "repair_successful": false
+  },
+  {
+    "session_id": "session_002",
+    "timestamp": "2026-05-26T16:47:45",
+    "task": "Implement the first task from task_breakdown.md. If no task is defined, create a simple calculator module with an add(a, b) function and tests. Preserve the workspace structure and run validation with pytest and Ruff.",
+    "failure_layer": "feedback",
+    "tool": "pytest_or_ruff",
+    "error_summary": "\nCommand: pytest tests/test_calculator.py\nReturn code: 4\n\nSTDOUT:\n============================= test session starts =============================\nplatform win32 -- Python 3.13.5, pytest-9.0.3, pluggy-1.6.0\nrootdir: C:\\Users\\justi\\Documents\\Harness-MVP\\workspace\nconfigfile: pyproject.toml\nplugins: anyio-4.13.0\ncollected 0 items\n\n============================ no tests ran in 0.04s ============================\n\n\nSTDERR:\nERROR: file or directory not found: tests/test_calculator.py\n\n\n\n",
+    "repair_rule_used": "llm_fix_prompt",
+    "repair_successful": false
+  },
+  {
+    "session_id": "session_002",
+    "timestamp": "2026-05-26T16:47:45",
+    "task": "Implement the first task from task_breakdown.md. If no task is defined, create a simple calculator module with an add(a, b) function and tests. Preserve the workspace structure and run validation with pytest and Ruff.",
+    "failure_layer": "preflight",
+    "tool": "preflight",
+    "error_summary": "Workspace layout is invalid after repair.",
+    "repair_rule_used": "pytest_preflight_repair",
+    "repair_successful": false
+  },
+  {
+    "session_id": "session_003",
+    "timestamp": "2026-05-26T17:10:19",
+    "task": "Implement the first task from task_breakdown.md. If no task is defined, create a simple calculator module with an add(a, b) function and tests. Preserve the workspace structure and run validation with pytest and Ruff.",
+    "failure_layer": "initialization",
+    "tool": "startup_readiness",
+    "error_summary": "State consistency: F001 marked completed but src/calculator.py is missing.\nState consistency: F001 marked completed but tests/test_calculator.py is missing.",
+    "repair_rule_used": null,
+    "repair_successful": false
+  },
+  {
+    "session_id": "session_004",
+    "timestamp": "2026-05-26T17:26:32",
+    "task": "Implement the first task from task_breakdown.md. If no task is defined, create a simple calculator module with an add(a, b) function and tests. Preserve the workspace structure and run validation with pytest and Ruff.",
+    "failure_layer": "preflight",
+    "tool": "preflight",
+    "error_summary": "Workspace layout is invalid.",
+    "repair_rule_used": "pytest_preflight_repair",
+    "repair_successful": false
+  },
+  {
+    "session_id": "session_005",
+    "timestamp": "2026-05-26T17:45:15",
+    "task": "Implement the first task from task_breakdown.md. If no task is defined, create a simple calculator module with an add(a, b) function and tests. Preserve the workspace structure and run validation with pytest and Ruff.",
+    "failure_layer": "preflight",
+    "tool": "preflight",
+    "error_summary": "workspace\\tests\\test_calculator.py: uses `from src...` import. This project uses pythonpath=['src'], so import directly instead.",
+    "repair_rule_used": "apply_preflight_repairs",
+    "repair_successful": true
+  },
+  {
+    "session_id": "session_005",
+    "timestamp": "2026-05-26T17:45:17",
+    "task": "Implement the first task from task_breakdown.md. If no task is defined, create a simple calculator module with an add(a, b) function and tests. Preserve the workspace structure and run validation with pytest and Ruff.",
+    "failure_layer": "feedback",
+    "tool": "ruff",
+    "error_summary": "\nCommand: pytest tests/test_calculator.py\nReturn code: 0\n\nSTDOUT:\n============================= test session starts =============================\nplatform win32 -- Python 3.13.5, pytest-9.0.3, pluggy-1.6.0\nrootdir: C:\\Users\\justi\\Documents\\Harness-MVP\\workspace\nconfigfile: pyproject.toml\nplugins: anyio-4.13.0\ncollected 1 item\n\ntests\\test_calculator.py .                                               [100%]\n\n============================== 1 passed in 0.09s ==============================\n\n\nSTDERR:\n",
+    "repair_rule_used": "apply_basic_ruff_repairs",
+    "repair_successful": true
+  }
+]

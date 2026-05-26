@@ -1,6 +1,6 @@
 from pathlib import Path
 
-WORKSPACE = Path("workspace") if Path("workspace").exists() else Path(".")
+WORKSPACE = Path("workspace")
 
 
 def test_continuity_files_exist():
@@ -12,6 +12,7 @@ def test_continuity_files_exist():
         "run_history.json",
         "failure_log.json",
         "DECISIONS.md",
+        "docs/debugging-policy.md",
         "docs/session-handoff.md",
     ]
 

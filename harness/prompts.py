@@ -1,4 +1,4 @@
-def build_plan_prompt(user_request: str, context: str) -> str:
+def build_plan_prompt(user_request: str, resolved_task: str, context: str) -> str:
     return f"""
 You are working inside a harnessed software project.
 
@@ -6,8 +6,14 @@ Your job is to create an implementation plan only.
 
 Do not write code yet.
     
-User request:
+Original user request:
 {user_request}
+
+Resolved implementation task:
+{resolved_task}
+
+You must plan for the resolved implementation task.
+Do not reinterpret it as startup readiness unless the resolved task explicitly says startup readiness.
 
 Project context:
 {context}
@@ -33,15 +39,29 @@ List the commands that should be run.
 Describe any task_breakdown.md status update the harness controller should consider after validation.
 """
 
-def build_code_prompt(user_request: str, context: str, plan: str) -> str: 
+def build_code_prompt(
+    user_request: str,
+    resolved_task: str,
+    context: str,
+    plan: str,
+    required_files: list[str],
+) -> str:
+    required_files_text = "\n".join(f"- {file}" for file in required_files)
+
     return f"""
 You are working inside a harnessed software project.
 
 The workspace root is already handled by the harness.
 You must return paths relative to the workspace root.
 
-User request:
+Original user request:
 {user_request}
+
+Resolved implementation task:
+{resolved_task}
+
+Implement the resolved implementation task.
+Do not reinterpret it as startup readiness unless the resolved task explicitly says startup readiness.
 
 Project context:
 {context}
@@ -50,6 +70,22 @@ Implementation plan:
 {plan}
 
 Now generate the required file changes.
+
+For implementation tasks, you must return at least one valid FILE block.
+
+Required files for this task:
+{required_files_text}
+
+If you do not return these files, the harness will reject the output.
+Do not return explanations.
+Do not return validation reports.
+Do not return NO_FILE_CHANGES for implementation tasks.
+
+Important no-change rule:
+- If the user request asks only for startup readiness, initialization, inspection, summary,
+  or validation, do not create or modify files.
+- If no file changes are needed, return exactly:
+NO_FILE_CHANGES
 
 Path rules:
 - Use paths relative to the workspace root.
@@ -101,8 +137,44 @@ full file content here
 ```
 """
 
+
+def build_generation_retry_prompt(
+    user_request: str,
+    resolved_task: str,
+    required_files: list[str],
+    previous_output: str,
+) -> str:
+    required_files_text = "\n".join(f"- {file}" for file in required_files)
+
+    return f"""
+Your previous output did not satisfy the implementation generation contract.
+
+Original user request:
+{user_request}
+
+Resolved implementation task:
+{resolved_task}
+
+Required files for this task:
+{required_files_text}
+
+Previous output:
+{previous_output}
+
+Return ONLY valid FILE blocks for the required files.
+Do not return explanations.
+Do not return validation reports.
+Do not return NO_FILE_CHANGES.
+
+FILE: src/example.py
+```python
+full file content here
+```
+"""
+
 def build_fix_prompt(
     user_request: str,
+    resolved_task: str,
     context: str,
     validation_output: str,
 ) -> str:
@@ -111,6 +183,9 @@ The previous implementation failed validation.
 
 User request:
 {user_request}
+
+Resolved implementation task:
+{resolved_task}
 
 Project context:
 {context}

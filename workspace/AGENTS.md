@@ -38,6 +38,7 @@ The harness controller owns workspace setup, validation, repair attempts, and st
 ## Topic Docs
 - `harness_map.md` - read first to understand the harness structure.
 - `docs/testing-standards.md` - read when writing or repairing tests.
+- `docs/debugging-policy.md` - read before repairing validation failures.
 - `docs/repair-rules-guide.md` - read when changing validation parsing or repair prompts.
 - `docs/state-management.md` - read when updating `progress.md`, `feature_list.json`, `run_history.json`, or `failure_log.json`.
 - `task_breakdown.md` - read during initialization to identify the active task, acceptance criteria, validation requirements, and next step.

@@ -24,6 +24,68 @@ def apply_basic_import_repairs(validation_output: str) -> list[str]:
     return changed_files
 
 
+def apply_preflight_repairs(preflight_output: str) -> list[str]:
+    changed_files = []
+
+    if "uses `from src...` import" in preflight_output:
+        changed_files.extend(apply_from_src_import_repairs())
+
+    if "imports pytest but does not use pytest features" in preflight_output:
+        changed_files.extend(remove_unused_pytest_imports())
+
+    if "uses pytest features but does not import pytest" in preflight_output:
+        changed_files.extend(apply_basic_pytest_repairs(preflight_output))
+
+    return unique_files(changed_files)
+
+
+def apply_from_src_import_repairs() -> list[str]:
+    changed_files = []
+
+    for test_file in (WORKSPACE_DIR / "tests").glob("test_*.py"):
+        content = test_file.read_text(encoding="utf-8")
+        updated = content.replace("from src.", "from ")
+
+        if updated != content:
+            test_file.write_text(updated, encoding="utf-8")
+            changed_files.append(str(test_file))
+
+    return changed_files
+
+
+def remove_unused_pytest_imports() -> list[str]:
+    changed_files = []
+
+    for test_file in (WORKSPACE_DIR / "tests").glob("test_*.py"):
+        content = test_file.read_text(encoding="utf-8")
+
+        if "import pytest" not in content:
+            continue
+
+        uses_pytest = "pytest." in content or "@pytest" in content
+        if uses_pytest:
+            continue
+
+        updated = content.replace("import pytest\n\n", "")
+        updated = updated.replace("import pytest\n", "")
+
+        if updated != content:
+            test_file.write_text(updated, encoding="utf-8")
+            changed_files.append(str(test_file))
+
+    return changed_files
+
+
+def unique_files(files: list[str]) -> list[str]:
+    unique = []
+
+    for file in files:
+        if file not in unique:
+            unique.append(file)
+
+    return unique
+
+
 def apply_basic_ruff_repairs(validation_output: str) -> list[str]:
     changed_files = []
 
@@ -33,19 +95,9 @@ def apply_basic_ruff_repairs(validation_output: str) -> list[str]:
     if "I001" in validation_output:
         changed_files.extend(apply_ruff_auto_fix())
 
-    for test_file in (WORKSPACE_DIR / "tests").glob("test_*.py"):
-        content = test_file.read_text(encoding="utf-8")
-        updated = content
+    changed_files.extend(remove_unused_pytest_imports())
 
-        if "import pytest" in updated and "pytest." not in updated and "@pytest" not in updated:
-            updated = updated.replace("import pytest\n\n", "")
-            updated = updated.replace("import pytest\n", "")
-
-        if updated != content:
-            test_file.write_text(updated, encoding="utf-8")
-            changed_files.append(str(test_file))
-
-    return changed_files
+    return unique_files(changed_files)
 
 
 def apply_ruff_auto_fix() -> list[str]:

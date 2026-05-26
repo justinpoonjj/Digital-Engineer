@@ -21,7 +21,8 @@
 ## Project Structure
 
 - `src/` - generated source code
-- `tests/` - generated tests
+- `tests/` - generated product tests
+- root `../tests/` - harness/controller tests
 - `AGENTS.md` - agent routing instructions
 - `harness_map.md` - harness subsystem map
 - `docs/` - focused topic docs
@@ -35,10 +36,25 @@
 - [ ] A fresh agent can identify the next task.
 - [ ] A fresh agent can identify validation commands.
 
+## Readiness Report
+
+Startup readiness should print deterministic evidence for its final decision:
+
+- required files found and readable
+- required directories found
+- validation commands available
+- task breakdown sections visible
+- preflight result
+- final decision of `READY` or `NOT READY`
+
+Startup readiness checks workspace landing zones such as `src/` and `tests/`.
+Task-specific product files, such as `src/calculator.py` and `tests/test_calculator.py`, are required after generation rather than during startup.
+
 ## Task Breakdown Readiness
 
 - [ ] `task_breakdown.md` exists.
-- [ ] It has one clear active task.
+- [ ] It separates initialization status from the active implementation task.
+- [ ] It has one clear active implementation task.
 - [ ] Each task has acceptance criteria.
 - [ ] Each task has validation requirements.
 - [ ] There is a clear next step.
