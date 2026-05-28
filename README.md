@@ -57,7 +57,9 @@ User request
 -> intent parser
 -> initialization phase
 -> task resolver
+-> task reconciliation
 -> task contract builder
+-> file state inspection
 -> implementation context loading
 -> plan generation
 -> plan acceptance gate
@@ -141,7 +143,7 @@ Next Step
 
 The LLM may propose task breakdown updates, but the harness controller owns final task status updates after validation.
 
-## Task Resolution
+## Task Resolution And Reconciliation
 
 Ambiguous requests such as:
 
@@ -157,6 +159,19 @@ Resolved implementation task
 ```
 
 This prevents the model from treating startup readiness as the implementation task.
+
+For direct implementation requests, the latest user prompt wins over durable
+workspace state. The controller compares the latest request with
+`workspace/task_breakdown.md`, classifies it as the same task, an extension, a
+replacement, or new work, and passes that decision to the planner before the
+full workspace context. Older task files are treated as context unless the user
+explicitly asks to implement a task from `task_breakdown.md`.
+
+The controller also inspects required source and test files before planning.
+Existing files are labeled as files to modify or extend, while missing files are
+labeled as files to create. This prevents plans that say to recreate
+`src/calculator.py` or `tests/test_calculator.py` when those files already
+exist.
 
 ## Task Contracts
 

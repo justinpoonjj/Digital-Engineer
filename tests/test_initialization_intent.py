@@ -1,4 +1,6 @@
+import shutil
 import sys
+import uuid
 from pathlib import Path
 
 import pytest
@@ -9,8 +11,19 @@ if str(REPO_ROOT) not in sys.path:
 
 import main
 from harness.execution_manager import apply_file_changes
+from harness.prompts import build_plan_prompt
 from harness.repair_rules import apply_preflight_repairs
 from harness.validator import run_validation
+
+
+def make_local_test_workspace() -> Path:
+    workspace = Path("tests") / ".tmp" / uuid.uuid4().hex / "workspace"
+    workspace.mkdir(parents=True)
+    return workspace
+
+
+def remove_local_test_workspace(workspace: Path) -> None:
+    shutil.rmtree(workspace.parents[1], ignore_errors=True)
 
 
 def test_initialization_only_request_is_detected():
@@ -113,6 +126,91 @@ def test_first_task_prompt_does_not_resolve_to_startup_readiness():
     assert "startup readiness" not in resolved.lower()
     assert "add" in resolved.lower()
     assert "calculator" in resolved.lower()
+
+
+def test_latest_user_request_overrides_stale_task_breakdown(monkeypatch):
+    workspace = make_local_test_workspace()
+    try:
+        (workspace / "task_breakdown.md").write_text(
+            "## Current Active Implementation Task\n"
+            "Create a simple calculator module with an add(a, b) function and tests.\n",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(main, "WORKSPACE_DIR", workspace)
+
+        reconciliation = main.reconcile_user_task(
+            "Add subtract function, division function, multiplication function "
+            "to the calculator file."
+        )
+
+        assert "subtract" in reconciliation.resolved_task.lower()
+        assert "division" in reconciliation.resolved_task.lower()
+        assert "multiplication" in reconciliation.resolved_task.lower()
+        assert reconciliation.relationship == "extension"
+        assert "highest-priority" in reconciliation.decision
+    finally:
+        remove_local_test_workspace(workspace)
+
+
+def test_task_breakdown_is_used_when_latest_request_explicitly_asks_for_it(
+    monkeypatch,
+):
+    workspace = make_local_test_workspace()
+    try:
+        (workspace / "task_breakdown.md").write_text(
+            "## Current Active Implementation Task\n"
+            "Create a simple calculator module with an add(a, b) function and tests.\n",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(main, "WORKSPACE_DIR", workspace)
+
+        resolved = main.resolve_user_task(
+            "Implement the first task from task_breakdown.md."
+        )
+
+        assert "add(a, b)" in resolved
+    finally:
+        remove_local_test_workspace(workspace)
+
+
+def test_file_state_summary_marks_existing_files_as_modify(monkeypatch):
+    workspace = make_local_test_workspace()
+    try:
+        (workspace / "src").mkdir(parents=True)
+        (workspace / "tests").mkdir()
+        (workspace / "src" / "calculator.py").write_text(
+            "def add(a, b):\n    return a + b\n",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(main, "WORKSPACE_DIR", workspace)
+
+        summary = main.describe_file_state(
+            ["src/calculator.py", "tests/test_calculator.py"]
+        )
+
+        assert "src/calculator.py: exists; planner should modify or extend." in summary
+        assert "tests/test_calculator.py: missing; planner should create." in summary
+    finally:
+        remove_local_test_workspace(workspace)
+
+
+def test_plan_prompt_contains_task_priority_and_file_state_rules():
+    prompt = build_plan_prompt(
+        user_request="Add subtract, multiply, and divide to the calculator file.",
+        resolved_task="Add subtract, multiply, and divide to the calculator file.",
+        context=(
+            "# Task Reconciliation\n"
+            "- task_breakdown.md active task: Add add(a, b)\n"
+            "- Relationship: extension\n"
+        ),
+    )
+
+    assert "latest user request is the highest-priority source of truth" in prompt
+    assert "If project context says a file exists" in prompt
+    assert "same task, an extension, a replacement, or a conflict" in prompt
 
 
 def test_implementation_request_rejects_no_change_plan():

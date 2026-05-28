@@ -46,6 +46,15 @@ class TaskContract:
 
 
 @dataclass
+class TaskReconciliation:
+    latest_user_request: str
+    task_breakdown_task: str
+    resolved_task: str
+    relationship: str
+    decision: str
+
+
+@dataclass
 class GateResult:
     passed: bool
     reason: str
@@ -331,21 +340,16 @@ def is_implementation_request(user_request: str) -> bool:
     return any(phrase in request for phrase in implementation_phrases)
 
 
-def resolve_user_task(user_request: str) -> str:
-    request = user_request.lower()
-
-    if "first task from task_breakdown" not in request:
-        return user_request
-
+def read_active_task_from_task_breakdown() -> str:
     task_path = WORKSPACE_DIR / "task_breakdown.md"
     if not task_path.exists():
-        return DEFAULT_IMPLEMENTATION_TASK
+        return ""
 
     content = task_path.read_text(encoding="utf-8")
 
     marker = "## Current Active Implementation Task"
     if marker not in content:
-        return DEFAULT_IMPLEMENTATION_TASK
+        return ""
 
     after_marker = content.split(marker, 1)[1].strip()
     task_lines = []
@@ -359,9 +363,110 @@ def resolve_user_task(user_request: str) -> str:
     resolved = " ".join(task_lines).strip()
 
     if not resolved or "startup readiness" in resolved.lower():
-        return DEFAULT_IMPLEMENTATION_TASK
+        return ""
 
     return resolved
+
+
+def request_uses_task_breakdown_as_source(user_request: str) -> bool:
+    request = user_request.lower()
+    return (
+        "first task from task_breakdown" in request
+        or "current task from task_breakdown" in request
+        or "active task from task_breakdown" in request
+    )
+
+
+def classify_task_relationship(user_request: str, task_breakdown_task: str) -> str:
+    if not task_breakdown_task:
+        return "new"
+
+    user_text = user_request.lower()
+    task_text = task_breakdown_task.lower()
+
+    if user_text.strip() == task_text.strip():
+        return "same"
+
+    if request_uses_task_breakdown_as_source(user_request):
+        return "same"
+
+    calculator_terms = [
+        "calculator",
+        "add",
+        "subtract",
+        "multiply",
+        "division",
+        "divide",
+    ]
+    user_mentions_calculator = any(term in user_text for term in calculator_terms)
+    task_mentions_calculator = any(term in task_text for term in calculator_terms)
+
+    if user_mentions_calculator and task_mentions_calculator:
+        return "extension"
+
+    return "replacement"
+
+
+def reconcile_user_task(user_request: str) -> TaskReconciliation:
+    task_breakdown_task = read_active_task_from_task_breakdown()
+
+    if request_uses_task_breakdown_as_source(user_request):
+        resolved_task = task_breakdown_task or DEFAULT_IMPLEMENTATION_TASK
+        relationship = "same"
+        decision = (
+            "The latest user request explicitly asked to use task_breakdown.md, "
+            "so the active task from that file is the implementation task."
+        )
+    else:
+        resolved_task = user_request
+        relationship = classify_task_relationship(user_request, task_breakdown_task)
+        decision = (
+            "The latest user request is the highest-priority source of truth. "
+            "Workspace task files are context only and must not override it."
+        )
+
+    return TaskReconciliation(
+        latest_user_request=user_request,
+        task_breakdown_task=task_breakdown_task or "(none found)",
+        resolved_task=resolved_task,
+        relationship=relationship,
+        decision=decision,
+    )
+
+
+def resolve_user_task(user_request: str) -> str:
+    return reconcile_user_task(user_request).resolved_task
+
+
+def describe_file_state(files: list[str]) -> str:
+    if not files:
+        return "- No task-specific required files were inferred."
+
+    lines = []
+    for file in files:
+        path = WORKSPACE_DIR / file
+        action = "modify or extend" if path.exists() else "create"
+        state = "exists" if path.exists() else "missing"
+        lines.append(f"- {file}: {state}; planner should {action}.")
+
+    return "\n".join(lines)
+
+
+def build_task_control_context(
+    reconciliation: TaskReconciliation,
+    contract: TaskContract,
+) -> str:
+    return f"""
+# Task Reconciliation
+- Latest user request: {reconciliation.latest_user_request}
+- task_breakdown.md active task: {reconciliation.task_breakdown_task}
+- Relationship: {reconciliation.relationship}
+- Decision: {reconciliation.decision}
+- Resolved implementation task: {reconciliation.resolved_task}
+
+# File State Inspection
+{describe_file_state(contract.required_files)}
+"""
 
 
 def plan_requires_no_file_changes(plan: str) -> bool:
@@ -384,9 +489,18 @@ def build_allowed_scope(resolved_task: str) -> list[str]:
 def build_task_contract(resolved_task: str) -> TaskContract:
     task = resolved_task.lower()
 
-    if "calculator" in task or "add(a, b)" in task:
+    calculator_terms = [
+        "calculator",
+        "add(a, b)",
+        "subtract",
+        "multiply",
+        "division",
+        "divide",
+    ]
+
+    if any(term in task for term in calculator_terms):
         return TaskContract(
-            task_type="calculator_add",
+            task_type="calculator",
             required_files=["src/calculator.py", "tests/test_calculator.py"],
             allowed_files=["src/calculator.py", "tests/test_calculator.py"],
             validation_profile="calculator",
@@ -674,14 +788,25 @@ def run_harness(user_request: str) -> None:
         )
         return
 
-    resolved_task = resolve_user_task(user_request)
+    reconciliation = reconcile_user_task(user_request)
+    resolved_task = reconciliation.resolved_task
     contract = build_task_contract(resolved_task)
     allowed_files = contract.allowed_files
-    context = load_context(mode="implementation")
+    context = (
+        build_task_control_context(reconciliation, contract)
+        + load_context(mode="implementation")
+    )
 
     from harness.llm_service import call_llm
 
     print("\n=== Implementation Phase ===")
+    print("\n=== Task Reconciliation ===")
+    print(f"Latest user request: {reconciliation.latest_user_request}")
+    print(f"task_breakdown.md active task: {reconciliation.task_breakdown_task}")
+    print(f"Relationship: {reconciliation.relationship}")
+    print(f"Decision: {reconciliation.decision}")
+    print(f"Resolved implementation task: {resolved_task}")
+
     print("\n=== Planning ===")
     plan_prompt = build_plan_prompt(
         user_request=user_request,
@@ -942,7 +1067,10 @@ def run_harness(user_request: str) -> None:
         fix_attempts += 1
 
         print(f"\n=== Fix attempt {fix_attempts} ===")
-        context = load_context(mode="implementation")
+        context = (
+            build_task_control_context(reconciliation, contract)
+            + load_context(mode="implementation")
+        )
 
         fix_prompt = build_fix_prompt(
             user_request=user_request,

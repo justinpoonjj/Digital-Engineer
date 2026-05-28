@@ -12,6 +12,19 @@ Original user request:
 Resolved implementation task:
 {resolved_task}
 
+Task priority rules:
+- The latest user request is the highest-priority source of truth for this run.
+- task_breakdown.md, progress.md, feature_list.json, and run history are context only.
+- If the latest user request differs from task_breakdown.md, plan for the latest user request.
+- Treat older workspace tasks as stale unless the latest request explicitly asks to use them.
+- Preserve useful completed work, but do not repeat already completed work.
+
+Stale task check:
+1. Identify what the user explicitly asked for in the latest request.
+2. Compare it with the task_breakdown.md active task shown in project context.
+3. Explain whether the latest request is the same task, an extension, a replacement, or a conflict.
+4. Plan only the resolved implementation task.
+
 You must plan for the resolved implementation task.
 Do not reinterpret it as startup readiness unless the resolved task explicitly says startup readiness.
 
@@ -31,6 +44,8 @@ Give a numbered plan.
 
 ## Files To Change
 List the files that should be created or modified.
+If project context says a file exists, say it will be modified or extended, not created.
+Never plan to recreate an existing file unless the latest user request explicitly requires replacement.
 
 ## Validation Plan
 List the commands that should be run.
@@ -59,6 +74,12 @@ Original user request:
 
 Resolved implementation task:
 {resolved_task}
+
+Task priority rules:
+- The latest user request is the highest-priority source of truth for this run.
+- Workspace task files are context only and must not override the latest user request.
+- If the implementation plan or task_breakdown.md mentions stale work, implement only the resolved implementation task above.
+- Preserve existing source and test behavior unless the latest user request explicitly asks to replace it.
 
 Implement the resolved implementation task.
 Do not reinterpret it as startup readiness unless the resolved task explicitly says startup readiness.
@@ -97,6 +118,8 @@ Path rules:
 - Do not create or modify any nested `workspace/` directory.
 
 File modification rules:
+- Inspect the project context file-state summary.
+- Modify or extend existing files instead of recreating them.
 - Do not modify `AGENTS.md`.
 - Do not modify `progress.md`.
 - Do not modify `feature_list.json`.
@@ -186,6 +209,11 @@ User request:
 
 Resolved implementation task:
 {resolved_task}
+
+Task priority rules:
+- The latest user request is the highest-priority source of truth.
+- Do not use stale task_breakdown.md content to replace or shrink the resolved implementation task.
+- If the failed implementation followed an older task, correct it to match the resolved task above.
 
 Project context:
 {context}
